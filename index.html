@@ -391,7 +391,8 @@
     <script src="./dragnet.js"></script>
     <script>
       let svg = document.querySelector('svg');
-      this.dragnet = new Dragnet(svg);
+      const reuseAnswers = true;
+      this.dragnet = new Dragnet(svg, reuseAnswers);
       this.dragnet.parseLabels();
       this.dragnet.onIncorrect = function() { alert('bleh'); }
       this.dragnet.onCorrect = function() { alert('exactly right!'); }

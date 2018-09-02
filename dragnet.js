@@ -1,4 +1,4 @@
-const REGEX = /\{(.+)\}/;
+const ANSWER_REGEX = /\{(.+)\}/;
 const LABEL_DATA_ATTRIBUTE = 'data-dragnet-label';
 const DRAGGABLE_CLASS = 'dragnet__label';
 
@@ -22,12 +22,14 @@ let detectOverlap = (function () {
     };
 })();
 
-var Dragnet = class {
-  constructor(svg) {
+class Dragnet {
+  constructor(svg, reuseAnswers = false) {
     this.svg = svg;
     this.labelDataAttribute = LABEL_DATA_ATTRIBUTE;
     this.draggableClass = DRAGGABLE_CLASS;
-    this.regex = REGEX;
+    this.answerRegex = ANSWER_REGEX;
+
+    this.reuseAnswers = reuseAnswers;
   }
 
   // Public Methods
@@ -50,7 +52,7 @@ var Dragnet = class {
   // Private Methods, you're unlikely to have to modify these
   parseLabels() {
     this.svg.querySelectorAll('text').forEach((text, i) => {
-      let match = this.regex.exec(text.textContent);
+      let match = this.answerRegex.exec(text.textContent);
       if (!match) { return; }
       let answer = match[1];
       text.textContent = "--";
@@ -69,8 +71,12 @@ var Dragnet = class {
   }
 
   mouseDown(evt) {
-    if (!evt.target.classList.contains(DRAGGABLE_CLASS)) {
+    if (!evt.target.classList.contains(this.draggableClass)) {
       return;
+    }
+
+    if (this.reuseAnswers) {
+      this.cloneElement(evt.target);
     }
 
     this.selectedElement = evt.target;
@@ -116,31 +122,44 @@ var Dragnet = class {
   }
 
   hovered() {
-    let placeholders = Array.prototype.slice.call(this.svg.querySelectorAll(`[${this.labelDataAttribute}]`));
+    const placeholders = Array.from(this.svg.querySelectorAll(`[${this.labelDataAttribute}]`));
 
-    return placeholders.some(label => detectOverlap(label, this.selectedElement));
+    return placeholders.some(ph => detectOverlap(ph, this.selectedElement));
   }
 
   allMatched() {
-    let placeholders = Array.prototype.slice.call(this.svg.querySelectorAll(`[${this.labelDataAttribute}]`));
-    let labels = Array.prototype.slice.call(this.svg.querySelectorAll(`.${this.draggableClass}`));
+    const placeholders = Array.from(this.svg.querySelectorAll(`[${this.labelDataAttribute}]`));
+    const labels = Array.from(this.svg.querySelectorAll(`.${this.draggableClass}`));
 
-    return labels.every(element => {
-      return placeholders.some(label => detectOverlap(label, element));
-    });
+    return placeholders.every(ph =>
+      labels.some(label => detectOverlap(ph, label))
+    );
   }
 
   allCorrect() {
-    let placeholders = Array.prototype.slice.call(this.svg.querySelectorAll(`[${this.labelDataAttribute}]`));
-    let labels = Array.prototype.slice.call(this.svg.querySelectorAll(`.${this.draggableClass}`));
+    const placeholders = Array.from(this.svg.querySelectorAll(`[${this.labelDataAttribute}]`));
+    const labels = Array.from(this.svg.querySelectorAll(`.${this.draggableClass}`));
 
-    return labels.every(element => {
-      let hoveredElement = placeholders.find(label => detectOverlap(label, element));
-      return hoveredElement && element.textContent === hoveredElement.getAttribute(this.labelDataAttribute);
+    return placeholders.every(ph => {
+      const correctAnswer = ph.getAttribute(this.labelDataAttribute);
+      return labels.some(label => 
+        label.textContent === correctAnswer && detectOverlap(ph, label)
+      );
     });
   }
 
   resetPosition(target) {
-    target.setAttributeNS(null, 'transform', 'matrix(1 0 0 1 0 0)');
+    if (this.reuseAnswers) {
+      target.parentNode.removeChild(target);
+    } else {
+      target.setAttributeNS(null, 'transform', 'matrix(1 0 0 1 0 0)');
+    }
+  }
+
+  cloneElement(el) {
+    const newEl = el.cloneNode();
+    newEl.textContent = el.textContent;
+    this.svg.append(newEl);
+    return newEl;
   }
 };
