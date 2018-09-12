@@ -1,38 +1,33 @@
 const ANSWER_REGEX = /\{(.+)\}/;
+const ANSWER_PLACEHOLDER_TEXT = '--';
 const LABEL_DATA_ATTRIBUTE = 'data-dragnet-label';
 const DRAGGABLE_CLASS = 'dragnet__label';
 
-let detectOverlap = (function () {
-    function getPositions(elem) {
-        let pos = elem.getBoundingClientRect();
-        return [[pos.left, pos.right], [pos.top, pos.bottom]];
-    }
+function detectOverlap(elem1, elem2) {
+  const pos1 = elem1.getBoundingClientRect();
+  const pos2 = elem2.getBoundingClientRect();
 
-    function comparePositions(p1, p2) {
-        let r1, r2;
-        r1 = p1[0] < p2[0] ? p1 : p2;
-        r2 = p1[0] < p2[0] ? p2 : p1;
-        return r1[1] > r2[0] || r1[0] === r2[0];
-    }
+  const [ leftPos, rightPos ] = 
+    pos1.left < pos2.left ? [ pos1,  pos2 ] : [ pos2, pos1 ];
 
-    return function (a, b) {
-        let pos1 = getPositions(a),
-            pos2 = getPositions(b);
-        return comparePositions(pos1[0], pos2[0]) && comparePositions(pos1[1], pos2[1]);
-    };
-})();
+  const [ topPos, bottomPos ] = 
+    pos1.top < pos2.top ? [ pos1,  pos2 ] : [ pos2, pos1 ];
+
+  return rightPos.left <= leftPos.right && bottomPos.top <= topPos.bottom;
+}
+
 
 class Dragnet {
   constructor(svg, reuseAnswers = false) {
     this.svg = svg;
+    this.answerRegex = ANSWER_REGEX;
+    this.answerPlaceHolderText = ANSWER_PLACEHOLDER_TEXT;
     this.labelDataAttribute = LABEL_DATA_ATTRIBUTE;
     this.draggableClass = DRAGGABLE_CLASS;
-    this.answerRegex = ANSWER_REGEX;
 
     this.reuseAnswers = reuseAnswers;
   }
 
-  // Public Methods
   getX(index) {
     return 500;
   }
@@ -49,13 +44,13 @@ class Dragnet {
     alert('All answers are correct.');
   }
 
-  // Private Methods, you're unlikely to have to modify these
   parseLabels() {
     this.svg.querySelectorAll('text').forEach((text, i) => {
-      let match = this.answerRegex.exec(text.textContent);
+      const match = this.answerRegex.exec(text.textContent);
       if (!match) { return; }
-      let answer = match[1];
-      text.textContent = "--";
+
+      const answer = match[1];
+      text.textContent = this.answerPlaceHolderText;
       text.setAttribute(this.labelDataAttribute, answer);
       this.svg.insertAdjacentHTML('beforeend', `<text transform="matrix(1 0 0 1 0 0)"
         class="${this.draggableClass}" x="${this.getX(i)}" y="${this.getY(i)}">${answer}</text>`);
@@ -92,11 +87,11 @@ class Dragnet {
   mouseMove(evt) {
     if (!this.selectedElement) { return; }
 
-    let dx = evt.clientX - this.currentX;
-    let dy = evt.clientY - this.currentY;
+    const dx = evt.clientX - this.currentX;
+    const dy = evt.clientY - this.currentY;
     this.currentMatrix[4] += dx;
     this.currentMatrix[5] += dy;
-    let newMatrix = "matrix(" + this.currentMatrix.join(' ') + ")";
+    const newMatrix = "matrix(" + this.currentMatrix.join(' ') + ")";
 
     this.selectedElement.setAttributeNS(null, "transform", newMatrix);
     this.currentX = evt.clientX;
