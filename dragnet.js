@@ -16,6 +16,35 @@ function detectOverlap(elem1, elem2) {
   return rightPos.left <= leftPos.right && bottomPos.top <= topPos.bottom;
 }
 
+class AnswerChoiceList {
+  constructor(svg) {
+    this._draggableClass = DRAGGABLE_CLASS;
+    this._svg = svg;
+    this._choices = [];
+  }
+
+  add(choiceText) {
+    const choiceElement = document.createElementNS("http://www.w3.org/2000/svg", 'text');
+    const newChoiceIndex = this._choices.length;
+    choiceElement.setAttribute('x', this.getX(newChoiceIndex));
+    choiceElement.setAttribute('y', this.getY(newChoiceIndex));
+    choiceElement.setAttribute('transform', 'matrix(1 0 0 1 0 0)');
+    choiceElement.classList.add(this._draggableClass);
+    choiceElement.textContent = choiceText;
+
+    this._choices.push(choiceElement);
+    this._svg.appendChild(choiceElement);
+  }
+
+  getX(index) {
+    return 500;
+  }
+
+  getY(index) {
+    return 25 * (index + 1);
+  }
+}
+
 
 class Dragnet {
   constructor(svg, reuseAnswers = false) {
@@ -26,14 +55,6 @@ class Dragnet {
     this.draggableClass = DRAGGABLE_CLASS;
 
     this.reuseAnswers = reuseAnswers;
-  }
-
-  getX(index) {
-    return 500;
-  }
-
-  getY(index) {
-    return 25 * (index + 1);
   }
 
   onIncorrect() {
