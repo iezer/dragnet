@@ -1,3 +1,5 @@
+const Dragnet = (function() {
+
 const ANSWER_REGEX = /\{(.+)\}/;
 const ANSWER_PLACEHOLDER_TEXT = '--';
 const LABEL_DATA_ATTRIBUTE = 'data-dragnet-label';
@@ -16,24 +18,38 @@ function detectOverlap(elem1, elem2) {
   return rightPos.left <= leftPos.right && bottomPos.top <= topPos.bottom;
 }
 
-class AnswerChoiceList {
-  constructor(svg) {
-    this._draggableClass = DRAGGABLE_CLASS;
-    this._svg = svg;
-    this._choices = [];
-  }
+function newAnswerChoice(choiceText, x, y) {
+  const choiceElement = document.createElementNS("http://www.w3.org/2000/svg", 'text');
+  choiceElement.textContent = choiceText;
+  choiceElement.setAttribute('x', x);
+  choiceElement.setAttribute('y', y);
+  choiceElement.setAttribute('transform', 'matrix(1 0 0 1 0 0)');
+  choiceElement.classList.add(DRAGGABLE_CLASS);
 
-  add(choiceText) {
-    const choiceElement = document.createElementNS("http://www.w3.org/2000/svg", 'text');
-    const newChoiceIndex = this._choices.length;
-    choiceElement.setAttribute('x', this.getX(newChoiceIndex));
-    choiceElement.setAttribute('y', this.getY(newChoiceIndex));
-    choiceElement.setAttribute('transform', 'matrix(1 0 0 1 0 0)');
-    choiceElement.classList.add(this._draggableClass);
-    choiceElement.textContent = choiceText;
+  return choiceElement;
+}
 
-    this._choices.push(choiceElement);
-    this._svg.appendChild(choiceElement);
+function isDraggable(element) {
+  return element.classList.contains(DRAGGABLE_CLASS);
+}
+
+function extractAnswerText(placeholderElement) {
+  const match = ANSWER_REGEX.exec(placeholderElement.textContent);
+  return match ? match[1] : undefined;
+} 
+
+function parseTransform(transformValue) {
+  return transformValue.slice(7,-1).split(' ').map(parseFloat);
+}
+
+class Dragnet {
+  constructor(svg, reuseAnswers = false) {
+    this.answerPlaceHolderText = ANSWER_PLACEHOLDER_TEXT;
+    this.labelDataAttribute = LABEL_DATA_ATTRIBUTE;
+    this.draggableClass = DRAGGABLE_CLASS;
+
+    this.svg = svg;
+    this.reuseAnswers = reuseAnswers;
   }
 
   getX(index) {
@@ -42,19 +58,6 @@ class AnswerChoiceList {
 
   getY(index) {
     return 25 * (index + 1);
-  }
-}
-
-
-class Dragnet {
-  constructor(svg, reuseAnswers = false) {
-    this.svg = svg;
-    this.answerRegex = ANSWER_REGEX;
-    this.answerPlaceHolderText = ANSWER_PLACEHOLDER_TEXT;
-    this.labelDataAttribute = LABEL_DATA_ATTRIBUTE;
-    this.draggableClass = DRAGGABLE_CLASS;
-
-    this.reuseAnswers = reuseAnswers;
   }
 
   onIncorrect() {
@@ -67,14 +70,13 @@ class Dragnet {
 
   parseLabels() {
     this.svg.querySelectorAll('text').forEach((text, i) => {
-      const match = this.answerRegex.exec(text.textContent);
-      if (!match) { return; }
+      const answer = extractAnswerText(text);
+      if (! answer) { return; }
 
-      const answer = match[1];
       text.textContent = this.answerPlaceHolderText;
       text.setAttribute(this.labelDataAttribute, answer);
-      this.svg.insertAdjacentHTML('beforeend', `<text transform="matrix(1 0 0 1 0 0)"
-        class="${this.draggableClass}" x="${this.getX(i)}" y="${this.getY(i)}">${answer}</text>`);
+
+      this.svg.appendChild(newAnswerChoice(answer, this.getX(i), this.getY(i)));
     });
 
     this.setupEventListeners()
@@ -87,26 +89,26 @@ class Dragnet {
   }
 
   mouseDown(evt) {
-    if (!evt.target.classList.contains(this.draggableClass)) {
+    if (! isDraggable(evt.target)) {
       return;
     }
 
-    if (this.reuseAnswers) {
-      this.cloneElement(evt.target);
-    }
-
-    this.selectedElement = evt.target;
+    this.selectedChoice = evt.target;
     this.currentX = evt.clientX;
     this.currentY = evt.clientY;
-    this.currentMatrix = this.selectedElement.getAttributeNS(null, "transform").slice(7,-1).split(' ');
+    this.currentMatrix = parseTransform(this.selectedChoice.getAttribute("transform"));
 
-    for(let i=0; i < this.currentMatrix.length; i++) {
-      this.currentMatrix[i] = parseFloat(this.currentMatrix[i]);
+    if (this.reuseAnswers) {
+      this.svg.appendChild(
+        newAnswerChoice(
+          this.selectedChoice.textContent, 
+          this.selectedChoice.getAttribute('x'), this.selectedChoice.getAttribute('y')));
     }
+
   }
 
   mouseMove(evt) {
-    if (!this.selectedElement) { return; }
+    if (!this.selectedChoice) { return; }
 
     const dx = evt.clientX - this.currentX;
     const dy = evt.clientY - this.currentY;
@@ -114,16 +116,16 @@ class Dragnet {
     this.currentMatrix[5] += dy;
     const newMatrix = "matrix(" + this.currentMatrix.join(' ') + ")";
 
-    this.selectedElement.setAttributeNS(null, "transform", newMatrix);
+    this.selectedChoice.setAttribute("transform", newMatrix);
     this.currentX = evt.clientX;
     this.currentY = evt.clientY;
   }
 
   mouseUp(evt) {
-    if (!this.selectedElement) { return; }
+    if (!this.selectedChoice) { return; }
 
     if (!this.hovered()) {
-      this.resetPosition(this.selectedElement);
+      this.resetPosition(this.selectedChoice);
     }
 
     if (this.allMatched()) {
@@ -134,13 +136,13 @@ class Dragnet {
       }
     }
 
-    this.selectedElement = null;
+    this.selectedChoice = null;
   }
 
   hovered() {
     const placeholders = Array.from(this.svg.querySelectorAll(`[${this.labelDataAttribute}]`));
 
-    return placeholders.some(ph => detectOverlap(ph, this.selectedElement));
+    return placeholders.some(ph => detectOverlap(ph, this.selectedChoice));
   }
 
   allMatched() {
@@ -168,14 +170,10 @@ class Dragnet {
     if (this.reuseAnswers) {
       target.parentNode.removeChild(target);
     } else {
-      target.setAttributeNS(null, 'transform', 'matrix(1 0 0 1 0 0)');
+      target.setAttribute('transform', 'matrix(1 0 0 1 0 0)');
     }
   }
-
-  cloneElement(el) {
-    const newEl = el.cloneNode();
-    newEl.textContent = el.textContent;
-    this.svg.append(newEl);
-    return newEl;
-  }
 };
+
+return Dragnet;
+}());
