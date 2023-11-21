@@ -59,16 +59,9 @@ class Choice {
             if (downEvent.defaultPrevented) {
                 return;
             }
-            const target= document.createElement('div');
-            target.style.height= '10px';
-            target.style.width = '10px';
-            target.style.position= 'absolute';
-            target.style.border="10px solid red"
-            document.querySelector('body').append(target)
+           
             const onMouseMove = moveEvent => {  
-                target.style.left =  `${moveEvent.clientX}px`;
-                target.style.top =   `${moveEvent.clientY}px`;      
-                this.x = moveEvent.clientX;
+                this.x = moveEvent.clientX - 30;
                 this.y = moveEvent.clientY;
                 this.render();
             };
