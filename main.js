@@ -59,9 +59,16 @@ class Choice {
             if (downEvent.defaultPrevented) {
                 return;
             }
-
-            const onMouseMove = moveEvent => {
-                this.x = moveEvent.clientX - 30;
+            const target= document.createElement('div');
+            target.style.height= '10px';
+            target.style.width = '10px';
+            target.style.position= 'absolute';
+            target.style.border="10px solid red"
+            document.querySelector('body').append(target)
+            const onMouseMove = moveEvent => {  
+                target.style.left =  `${moveEvent.clientX}px`;
+                target.style.top =   `${moveEvent.clientY}px`;      
+                this.x = moveEvent.clientX;
                 this.y = moveEvent.clientY;
                 this.render();
             };
@@ -79,7 +86,7 @@ class Choice {
     }
 
     render() {
-        this.element.setAttribute('x', this.x);
+        this.element.setAttribute('x', this.x - 30);
         this.element.setAttribute('y', this.y);
         this.element.style.fill = this.color;
         this.element.textContent = this.value;
@@ -100,11 +107,14 @@ class Choice {
     }
 }
 
-
 function start(svg) {
     let filledSlotCount = 0;
     const slots = Array.from(svg.querySelectorAll('.slot'))
-                       .map(s => new Slot(s));
+    .map(s => new Slot(s));
+    
+    svg.setAttribute('viewBox', `0 0 ${svg.width.baseVal.value.toFixed()} ${svg.height.baseVal.value.toFixed()}`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', ' ')
 
     const choiceX = 500;
     const choiceY = 25;
